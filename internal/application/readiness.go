@@ -19,13 +19,42 @@ func (c *readinessCache) get(sessionID string) (*ReadinessView, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	view, ok := c.views[sessionID]
-	return view, ok
+	if !ok {
+		return nil, false
+	}
+	return cloneReadinessView(view), true
 }
 
 func (c *readinessCache) put(sessionID string, view *ReadinessView) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.views[sessionID] = view
+	c.views[sessionID] = cloneReadinessView(view)
+}
+
+func (c *readinessCache) invalidate(sessionID string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.views, sessionID)
+}
+
+// cloneReadinessView returns a deep copy of view so that callers mutating the
+// returned slices (NextActions, Gates, Lines) cannot corrupt the cached value,
+// and a cached value cannot alias a previously returned one.
+func cloneReadinessView(view *ReadinessView) *ReadinessView {
+	if view == nil {
+		return nil
+	}
+	clone := *view
+	if view.Lines != nil {
+		clone.Lines = append([]LineReadiness(nil), view.Lines...)
+	}
+	if view.Gates != nil {
+		clone.Gates = append([]ReadinessGate(nil), view.Gates...)
+	}
+	if view.NextActions != nil {
+		clone.NextActions = append([]string(nil), view.NextActions...)
+	}
+	return &clone
 }
 
 type ReadinessGate struct {

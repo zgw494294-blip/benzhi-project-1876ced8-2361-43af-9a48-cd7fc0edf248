@@ -94,6 +94,7 @@ func (s *Service) AddLoads(ctx context.Context, id string, cmd AddLoadsCommand) 
 	if err = s.repo.Save(ctx, session, expected, event, idem); err != nil {
 		return nil, err
 	}
+	s.readiness.invalidate(id)
 	return result, nil
 }
 func (s *Service) FinalizeModel(ctx context.Context, id string, cmd VersionCommand) (*domain.RiggingSession, error) {

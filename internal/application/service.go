@@ -90,5 +90,6 @@ func (s *Service) mutation(ctx context.Context, sessionID string, cmd VersionCom
 	if err := s.repo.Save(ctx, session, expected, event, idem); err != nil {
 		return nil, err
 	}
+	s.readiness.invalidate(session.ID)
 	return session, nil
 }

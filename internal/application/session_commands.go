@@ -26,6 +26,7 @@ func (s *Service) CreateSession(ctx context.Context, cmd CreateSessionCommand) (
 	if err := s.repo.Create(ctx, session, event, idem); err != nil {
 		return nil, err
 	}
+	s.readiness.invalidate(session.ID)
 	return session, nil
 }
 func (s *Service) ConfirmBaseline(ctx context.Context, id string, cmd BaselineCommand) (*domain.RiggingSession, error) {
