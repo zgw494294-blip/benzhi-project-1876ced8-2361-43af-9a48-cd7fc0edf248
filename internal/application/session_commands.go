@@ -9,7 +9,7 @@ import (
 func (s *Service) CreateSession(ctx context.Context, cmd CreateSessionCommand) (*domain.RiggingSession, error) {
 	unlock := s.locks.Lock("create:" + cmd.IdempotencyKey)
 	defer unlock()
-	if cached, ok, err := s.idempotent(ctx, cmd.IdempotencyKey, "create-session"); err != nil || ok {
+	if cached, ok, err := s.idempotent(ctx, cmd.IdempotencyKey, "create-session", ""); err != nil || ok {
 		return cached, err
 	}
 	now := s.now().UTC()
@@ -24,6 +24,9 @@ func (s *Service) CreateSession(ctx context.Context, cmd CreateSessionCommand) (
 		idem = &IdempotencyRecord{Key: cmd.IdempotencyKey, Operation: "create-session", SessionID: session.ID, Response: data, CreatedAt: now}
 	}
 	if err := s.repo.Create(ctx, session, event, idem); err != nil {
+		if IdempotencyConflict(err) {
+			return s.resolveIdempotencyConflict(ctx, cmd.IdempotencyKey, "create-session", "")
+		}
 		return nil, err
 	}
 	return session, nil

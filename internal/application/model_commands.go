@@ -92,9 +92,38 @@ func (s *Service) AddLoads(ctx context.Context, id string, cmd AddLoadsCommand) 
 		idem = &IdempotencyRecord{Key: cmd.IdempotencyKey, Operation: operation, SessionID: id, Response: data, CreatedAt: s.now().UTC()}
 	}
 	if err = s.repo.Save(ctx, session, expected, event, idem); err != nil {
+		if IdempotencyConflict(err) {
+			return s.resolveBatchIdempotencyConflict(ctx, cmd.IdempotencyKey, operation, id)
+		}
 		return nil, err
 	}
 	return result, nil
+}
+
+// resolveBatchIdempotencyConflict re-reads the batch idempotency record after a
+// commit collided with a concurrent writer. When the persisted record belongs
+// to the same job it replays the cached result (safe retry); otherwise it
+// returns a recognizable conflict so the caller never receives another job's
+// response or a raw database error.
+func (s *Service) resolveBatchIdempotencyConflict(ctx context.Context, key, operation, sessionID string) (*BatchLoadResult, error) {
+	if key == "" {
+		return nil, domain.NewError(domain.ErrConflict, "Idempotency-Key", "幂等键已用于其他作业")
+	}
+	record, err := s.repo.GetIdempotency(ctx, key, operation)
+	if err != nil {
+		if IsRepositoryNotFound(err) {
+			return nil, domain.NewError(domain.ErrConflict, "Idempotency-Key", "幂等键已用于其他作业")
+		}
+		return nil, err
+	}
+	if record.SessionID != sessionID {
+		return nil, domain.NewError(domain.ErrConflict, "Idempotency-Key", "幂等键已用于其他作业")
+	}
+	var result BatchLoadResult
+	if err = json.Unmarshal(record.Response, &result); err != nil {
+		return nil, err
+	}
+	return &result, nil
 }
 func (s *Service) FinalizeModel(ctx context.Context, id string, cmd VersionCommand) (*domain.RiggingSession, error) {
 	return s.mutation(ctx, id, cmd, "finalize-model", "MODEL_FINALIZED", "完成载荷建模", func(session *domain.RiggingSession) error { return session.FinalizeModel() })

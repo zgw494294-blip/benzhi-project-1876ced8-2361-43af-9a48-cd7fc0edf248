@@ -4,10 +4,33 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"rigging-readiness-desk/internal/application"
 	"rigging-readiness-desk/internal/domain"
+	"strings"
+
+	sqlite "modernc.org/sqlite"
 )
+
+const sqliteConstraint = 19
+
+// isIdempotencyConstraint reports whether err is a SQLite constraint violation
+// raised against idempotency_records. modernc/sqlite surfaces UNIQUE/PRIMARY
+// KEY failures as *sqlite.Error whose extended code keeps the SQLITE_CONSTRAINT
+// base (19). The accompanying message names the table so we can distinguish a
+// late idempotency collision from other UNIQUE constraints written in the same
+// transaction.
+func isIdempotencyConstraint(err error) bool {
+	var sqliteErr *sqlite.Error
+	if !errors.As(err, &sqliteErr) {
+		return false
+	}
+	if sqliteErr.Code()&0xFF != sqliteConstraint {
+		return false
+	}
+	return strings.Contains(sqliteErr.Error(), "idempotency_records")
+}
 
 func (s *Store) Create(ctx context.Context, session *domain.RiggingSession, event application.AuditEvent, idem *application.IdempotencyRecord) error {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -75,5 +98,10 @@ func insertIdempotency(ctx context.Context, tx *sql.Tx, record *application.Idem
 		return nil
 	}
 	_, err := tx.ExecContext(ctx, `INSERT INTO idempotency_records(key,operation,session_id,response,created_at) VALUES(?,?,?,?,?)`, record.Key, record.Operation, record.SessionID, record.Response, record.CreatedAt.Format(timeFormat))
+	if err != nil {
+		if isIdempotencyConstraint(err) {
+			return application.ErrIdempotencyConflict
+		}
+	}
 	return err
 }

@@ -33,7 +33,17 @@ func randomID() string {
 	return hex.EncodeToString(b[:])
 }
 func (s *Service) Close() error { return s.repo.Close() }
-func (s *Service) idempotent(ctx context.Context, key, operation string) (*domain.RiggingSession, bool, error) {
+
+// ErrIdempotencyConflict signals that an idempotency record for the same key and
+// operation was already committed by another job while the current transaction
+// was in flight. Callers re-query the repository and decide whether to replay
+// the cached response (same job retry) or surface a recognizable conflict
+// (different job). Storage implementations wrap SQLite UNIQUE-constraint
+// failures on idempotency_records with this error so database internals never
+// leak to callers.
+var ErrIdempotencyConflict = errors.New("idempotency key conflict")
+
+func (s *Service) idempotent(ctx context.Context, key, operation, sessionID string) (*domain.RiggingSession, bool, error) {
 	if key == "" {
 		return nil, false, nil
 	}
@@ -44,6 +54,9 @@ func (s *Service) idempotent(ctx context.Context, key, operation string) (*domai
 		}
 		return nil, false, err
 	}
+	if sessionID != "" && record.SessionID != sessionID {
+		return nil, false, domain.NewError(domain.ErrConflict, "Idempotency-Key", "幂等键已用于其他作业")
+	}
 	var session domain.RiggingSession
 	if err := json.Unmarshal(record.Response, &session); err != nil {
 		return nil, false, err
@@ -51,14 +64,41 @@ func (s *Service) idempotent(ctx context.Context, key, operation string) (*domai
 	return &session, true, nil
 }
 
+// resolveIdempotencyConflict re-reads the idempotency record after a commit
+// collided with a concurrent writer. When the persisted record belongs to the
+// same job it replays the cached response (safe retry); otherwise it returns a
+// recognizable conflict so the caller never receives another job's snapshot or
+// a raw database error.
+func (s *Service) resolveIdempotencyConflict(ctx context.Context, key, operation, sessionID string) (*domain.RiggingSession, error) {
+	if key == "" {
+		return nil, domain.NewError(domain.ErrConflict, "Idempotency-Key", "幂等键已用于其他作业")
+	}
+	record, err := s.repo.GetIdempotency(ctx, key, operation)
+	if err != nil {
+		if errors.Is(err, domainNotFound) {
+			return nil, domain.NewError(domain.ErrConflict, "Idempotency-Key", "幂等键已用于其他作业")
+		}
+		return nil, err
+	}
+	if sessionID != "" && record.SessionID != sessionID {
+		return nil, domain.NewError(domain.ErrConflict, "Idempotency-Key", "幂等键已用于其他作业")
+	}
+	var session domain.RiggingSession
+	if err := json.Unmarshal(record.Response, &session); err != nil {
+		return nil, err
+	}
+	return &session, nil
+}
+
 var domainNotFound = errors.New("record not found")
 
 func IsRepositoryNotFound(err error) bool { return errors.Is(err, domainNotFound) }
 func RepositoryNotFound() error           { return domainNotFound }
+func IdempotencyConflict(err error) bool  { return errors.Is(err, ErrIdempotencyConflict) }
 func (s *Service) mutation(ctx context.Context, sessionID string, cmd VersionCommand, operation, eventType, detail string, change func(*domain.RiggingSession) error) (*domain.RiggingSession, error) {
 	unlock := s.locks.Lock(sessionID)
 	defer unlock()
-	if cached, ok, err := s.idempotent(ctx, cmd.IdempotencyKey, operation); err != nil || ok {
+	if cached, ok, err := s.idempotent(ctx, cmd.IdempotencyKey, operation, sessionID); err != nil || ok {
 		return cached, err
 	}
 	session, err := s.repo.Get(ctx, sessionID)
@@ -87,6 +127,9 @@ func (s *Service) mutation(ctx context.Context, sessionID string, cmd VersionCom
 		idem = &IdempotencyRecord{Key: cmd.IdempotencyKey, Operation: operation, SessionID: session.ID, Response: data, CreatedAt: s.now().UTC()}
 	}
 	if err := s.repo.Save(ctx, session, expected, event, idem); err != nil {
+		if IdempotencyConflict(err) {
+			return s.resolveIdempotencyConflict(ctx, cmd.IdempotencyKey, operation, sessionID)
+		}
 		return nil, err
 	}
 	return session, nil
