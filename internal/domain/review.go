@@ -55,6 +55,8 @@ func (s *RiggingSession) ReturnReview(reviewer, reason, category string, lineIDs
 		}
 		seen[lineID] = struct{}{}
 		clean = append(clean, lineID)
+	}
+	for _, lineID := range clean {
 		s.Findings = append(s.Findings, SafetyFinding{ID: idFactory(), SessionID: s.ID, LineID: lineID, SourceType: "REVIEW", Severity: "BLOCKING", RuleCode: "REVIEW_" + normalized, Description: strings.TrimSpace(reason), OriginVersion: reviewedVersion, OriginActorID: strings.TrimSpace(reviewer), Status: FindingOpen})
 	}
 	s.Review = &SafetyReview{ReviewerID: strings.TrimSpace(reviewer), Decision: "RETURN", Reason: strings.TrimSpace(reason), Category: normalized, AffectedLineIDs: clean, ReviewedVersion: reviewedVersion, ReviewedAt: now.UTC()}
