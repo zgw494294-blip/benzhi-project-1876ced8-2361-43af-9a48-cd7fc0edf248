@@ -74,6 +74,9 @@ func (s *Service) mutation(ctx context.Context, sessionID string, cmd VersionCom
 	if err := change(session); err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	expected := session.Version
 	session.Version++
 	session.UpdatedAt = s.now().UTC()

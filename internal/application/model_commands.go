@@ -78,6 +78,9 @@ func (s *Service) AddLoads(ctx context.Context, id string, cmd AddLoadsCommand) 
 	if err = session.AddLoads(loads); err != nil {
 		return nil, err
 	}
+	if err = ctx.Err(); err != nil {
+		return nil, err
+	}
 	expected := session.Version
 	session.Version++
 	session.UpdatedAt = s.now().UTC()

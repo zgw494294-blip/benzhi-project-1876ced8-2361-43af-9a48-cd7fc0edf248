@@ -17,6 +17,9 @@ func (s *Service) CreateSession(ctx context.Context, cmd CreateSessionCommand) (
 	if err != nil {
 		return nil, err
 	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	data, _ := json.Marshal(session)
 	event := AuditEvent{ID: s.newID(), SessionID: session.ID, Type: "SESSION_CREATED", ActorID: cmd.OperatorID, Detail: "创建演出吊挂作业", CreatedAt: now}
 	var idem *IdempotencyRecord

@@ -32,6 +32,9 @@ func (s *Store) Create(ctx context.Context, session *domain.RiggingSession, even
 	if err = insertIdempotency(context.WithoutCancel(ctx), tx, idem); err != nil {
 		return err
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	return tx.Commit()
 }
 func (s *Store) Save(ctx context.Context, session *domain.RiggingSession, expected int64, event application.AuditEvent, idem *application.IdempotencyRecord) error {
@@ -62,6 +65,9 @@ func (s *Store) Save(ctx context.Context, session *domain.RiggingSession, expect
 		return err
 	}
 	if err = insertIdempotency(context.WithoutCancel(ctx), tx, idem); err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
 		return err
 	}
 	return tx.Commit()
