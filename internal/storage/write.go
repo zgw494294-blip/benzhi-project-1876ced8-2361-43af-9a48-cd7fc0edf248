@@ -10,7 +10,7 @@ import (
 )
 
 func (s *Store) Create(ctx context.Context, session *domain.RiggingSession, event application.AuditEvent, idem *application.IdempotencyRecord) error {
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.db.BeginTx(context.WithoutCancel(ctx), nil)
 	if err != nil {
 		return err
 	}
@@ -19,23 +19,23 @@ func (s *Store) Create(ctx context.Context, session *domain.RiggingSession, even
 	if err != nil {
 		return err
 	}
-	_, err = tx.ExecContext(ctx, `INSERT INTO sessions(id,title,venue,performance_at,operator_id,rule_set_version,status,version,created_at,updated_at,payload) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, session.ID, session.Title, session.Venue, session.PerformanceAt.Format(timeFormat), session.OperatorID, session.RuleSetVersion, string(session.Status), session.Version, session.CreatedAt.Format(timeFormat), session.UpdatedAt.Format(timeFormat), payload)
+	_, err = tx.ExecContext(context.WithoutCancel(ctx), `INSERT INTO sessions(id,title,venue,performance_at,operator_id,rule_set_version,status,version,created_at,updated_at,payload) VALUES(?,?,?,?,?,?,?,?,?,?,?)`, session.ID, session.Title, session.Venue, session.PerformanceAt.Format(timeFormat), session.OperatorID, session.RuleSetVersion, string(session.Status), session.Version, session.CreatedAt.Format(timeFormat), session.UpdatedAt.Format(timeFormat), payload)
 	if err != nil {
 		return fmt.Errorf("创建作业: %w", err)
 	}
-	if err = replaceChildren(ctx, tx, session); err != nil {
+	if err = replaceChildren(context.WithoutCancel(ctx), tx, session); err != nil {
 		return err
 	}
-	if err = insertAudit(ctx, tx, event); err != nil {
+	if err = insertAudit(context.WithoutCancel(ctx), tx, event); err != nil {
 		return err
 	}
-	if err = insertIdempotency(ctx, tx, idem); err != nil {
+	if err = insertIdempotency(context.WithoutCancel(ctx), tx, idem); err != nil {
 		return err
 	}
 	return tx.Commit()
 }
 func (s *Store) Save(ctx context.Context, session *domain.RiggingSession, expected int64, event application.AuditEvent, idem *application.IdempotencyRecord) error {
-	tx, err := s.db.BeginTx(ctx, nil)
+	tx, err := s.db.BeginTx(context.WithoutCancel(ctx), nil)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func (s *Store) Save(ctx context.Context, session *domain.RiggingSession, expect
 	if err != nil {
 		return err
 	}
-	result, err := tx.ExecContext(ctx, `UPDATE sessions SET title=?,venue=?,performance_at=?,operator_id=?,rule_set_version=?,status=?,version=?,updated_at=?,payload=? WHERE id=? AND version=?`, session.Title, session.Venue, session.PerformanceAt.Format(timeFormat), session.OperatorID, session.RuleSetVersion, string(session.Status), session.Version, session.UpdatedAt.Format(timeFormat), payload, session.ID, expected)
+	result, err := tx.ExecContext(context.WithoutCancel(ctx), `UPDATE sessions SET title=?,venue=?,performance_at=?,operator_id=?,rule_set_version=?,status=?,version=?,updated_at=?,payload=? WHERE id=? AND version=?`, session.Title, session.Venue, session.PerformanceAt.Format(timeFormat), session.OperatorID, session.RuleSetVersion, string(session.Status), session.Version, session.UpdatedAt.Format(timeFormat), payload, session.ID, expected)
 	if err != nil {
 		return err
 	}
@@ -55,13 +55,13 @@ func (s *Store) Save(ctx context.Context, session *domain.RiggingSession, expect
 	if affected != 1 {
 		return domain.NewError(domain.ErrConflict, "expectedVersion", "数据库中的作业版本已变化")
 	}
-	if err = replaceChildren(ctx, tx, session); err != nil {
+	if err = replaceChildren(context.WithoutCancel(ctx), tx, session); err != nil {
 		return err
 	}
-	if err = insertAudit(ctx, tx, event); err != nil {
+	if err = insertAudit(context.WithoutCancel(ctx), tx, event); err != nil {
 		return err
 	}
-	if err = insertIdempotency(ctx, tx, idem); err != nil {
+	if err = insertIdempotency(context.WithoutCancel(ctx), tx, idem); err != nil {
 		return err
 	}
 	return tx.Commit()
