@@ -13,17 +13,18 @@ import (
 type Clock func() time.Time
 type IDFactory func() string
 type Service struct {
-	repo  Repository
-	now   Clock
-	newID IDFactory
-	locks *keyedLocks
+	repo      Repository
+	now       Clock
+	newID     IDFactory
+	locks     *keyedLocks
+	readiness *readinessCache
 }
 
 func NewService(repo Repository) *Service {
-	return &Service{repo: repo, now: time.Now, newID: randomID, locks: newKeyedLocks()}
+	return &Service{repo: repo, now: time.Now, newID: randomID, locks: newKeyedLocks(), readiness: newReadinessCache()}
 }
 func NewServiceWith(repo Repository, now Clock, ids IDFactory) *Service {
-	return &Service{repo: repo, now: now, newID: ids, locks: newKeyedLocks()}
+	return &Service{repo: repo, now: now, newID: ids, locks: newKeyedLocks(), readiness: newReadinessCache()}
 }
 func randomID() string {
 	var b [16]byte

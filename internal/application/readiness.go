@@ -3,7 +3,30 @@ package application
 import (
 	"context"
 	"rigging-readiness-desk/internal/domain"
+	"sync"
 )
+
+type readinessCache struct {
+	mu    sync.RWMutex
+	views map[string]*ReadinessView
+}
+
+func newReadinessCache() *readinessCache {
+	return &readinessCache{views: map[string]*ReadinessView{}}
+}
+
+func (c *readinessCache) get(sessionID string) (*ReadinessView, bool) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	view, ok := c.views[sessionID]
+	return view, ok
+}
+
+func (c *readinessCache) put(sessionID string, view *ReadinessView) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.views[sessionID] = view
+}
 
 type ReadinessGate struct {
 	Code        string `json:"code"`
@@ -36,6 +59,9 @@ type ReadinessView struct {
 }
 
 func (s *Service) GetReadiness(ctx context.Context, id string) (*ReadinessView, error) {
+	if view, ok := s.readiness.get(id); ok {
+		return view, nil
+	}
 	session, err := s.repo.Get(ctx, id)
 	if err != nil {
 		return nil, err
@@ -74,6 +100,7 @@ func (s *Service) GetReadiness(ctx context.Context, id string) (*ReadinessView, 
 	if len(view.NextActions) == 0 {
 		view.NextActions = []string{"所有放行关口均已满足，凭据可用于该冻结场次。"}
 	}
+	s.readiness.put(id, view)
 	return view, nil
 }
 
