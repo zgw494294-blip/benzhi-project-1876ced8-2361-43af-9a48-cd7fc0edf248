@@ -7,7 +7,10 @@ import (
 )
 
 func (s *Service) CreateSession(ctx context.Context, cmd CreateSessionCommand) (*domain.RiggingSession, error) {
-	unlock := s.locks.Lock("create:" + cmd.IdempotencyKey)
+	unlock, err := s.locks.Lock(ctx, "create:"+cmd.IdempotencyKey)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	if cached, ok, err := s.idempotent(ctx, cmd.IdempotencyKey, "create-session"); err != nil || ok {
 		return cached, err

@@ -1,6 +1,9 @@
 package application
 
-import "sync"
+import (
+	"context"
+	"sync"
+)
 
 type keyedLocks struct {
 	mu    sync.Mutex
@@ -12,7 +15,10 @@ type lockEntry struct {
 }
 
 func newKeyedLocks() *keyedLocks { return &keyedLocks{locks: map[string]*lockEntry{}} }
-func (k *keyedLocks) Lock(key string) func() {
+func (k *keyedLocks) Lock(ctx context.Context, key string) (func(), error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	k.mu.Lock()
 	entry := k.locks[key]
 	if entry == nil {
@@ -30,5 +36,5 @@ func (k *keyedLocks) Lock(key string) func() {
 			delete(k.locks, key)
 		}
 		k.mu.Unlock()
-	}
+	}, nil
 }

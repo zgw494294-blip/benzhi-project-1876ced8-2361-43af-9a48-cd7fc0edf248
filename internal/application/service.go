@@ -56,7 +56,10 @@ var domainNotFound = errors.New("record not found")
 func IsRepositoryNotFound(err error) bool { return errors.Is(err, domainNotFound) }
 func RepositoryNotFound() error           { return domainNotFound }
 func (s *Service) mutation(ctx context.Context, sessionID string, cmd VersionCommand, operation, eventType, detail string, change func(*domain.RiggingSession) error) (*domain.RiggingSession, error) {
-	unlock := s.locks.Lock(sessionID)
+	unlock, err := s.locks.Lock(ctx, sessionID)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	if cached, ok, err := s.idempotent(ctx, cmd.IdempotencyKey, operation); err != nil || ok {
 		return cached, err

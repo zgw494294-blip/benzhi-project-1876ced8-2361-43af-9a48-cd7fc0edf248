@@ -40,7 +40,10 @@ func (s *Service) AddLoads(ctx context.Context, id string, cmd AddLoadsCommand) 
 	if cmd.ActorID == "" && len(cmd.Loads) > 0 {
 		cmd.ActorID = cmd.Loads[0].SubmittedBy
 	}
-	unlock := s.locks.Lock(id)
+	unlock, err := s.locks.Lock(ctx, id)
+	if err != nil {
+		return nil, err
+	}
 	defer unlock()
 	if cmd.IdempotencyKey != "" {
 		record, err := s.repo.GetIdempotency(ctx, cmd.IdempotencyKey, operation)
