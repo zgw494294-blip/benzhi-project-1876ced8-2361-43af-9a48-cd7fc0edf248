@@ -1,6 +1,6 @@
 # BENZHI_README
 
-基于 Go 实现的rigging-readiness-desk Web 项目，一款后端服务，用于支持rigging-readiness-desk的核心业务流程。
+基于 Go 实现的吊挂系统演出前安全放行 Web 项目，一款后端服务，用于管理吊挂载荷检查、问题整改、独立复核和演出启用放行。
 
 ## 项目说明
 - 项目：benzhi-project-1876ced8-2361-43af-9a48-cd7fc0edf248
