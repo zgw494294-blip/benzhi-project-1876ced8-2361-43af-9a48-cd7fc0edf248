@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>吊挂安全放行工作台</title>
+  <link rel="stylesheet" href="/assets/app.css">
+  <style>.queue{margin:0 clamp(20px,6vw,96px) 28px}.queue-item{display:grid;text-align:left;gap:5px;background:var(--panel2);color:var(--text);border:1px solid var(--line)}.queue-item span,.queue-item small,.queue-item p{color:var(--muted)}.check-label{display:flex;align-items:center;gap:8px}.check-label input{width:auto}table{width:100%;border-collapse:collapse;margin:16px 0;display:block;overflow:auto}th,td{padding:7px;min-width:130px;text-align:left;font-size:.75rem}th{color:var(--muted)}.plan-row{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:10px;margin:10px 0;padding:10px;background:var(--panel2);border-radius:8px}fieldset{border:1px solid var(--line);border-radius:8px;color:var(--muted)}@media(max-width:900px){.plan-row{grid-template-columns:1fr}}</style>
+</head>
+<body>
+  <header class="topbar">
+    <div><span class="eyebrow">RIGGING READINESS DESK</span><h1>吊挂安全放行工作台</h1></div>
+    <div id="connection" class="pill neutral">等待作业</div>
+  </header>
+  <main>
+    <section class="hero">
+      <div><p class="kicker">演出前安全放行</p><h2>把每一克载荷、每一次检查和每一项批准留在同一条证据链上。</h2><p>从设备基线到不可变启用凭据，页面中的状态与版本始终来自服务器。</p></div>
+      <div class="lookup"><label>打开已有作业<input id="lookup-id" placeholder="输入作业 ID"></label><button id="lookup">载入</button></div>
+    </section>
+    <section class="queue card">
+      <div class="card-head"><span>待办</span><div><h3>作业队列</h3><p>组合筛选临近演出并从既有详情入口续办。</p></div></div>
+      <form id="queue-filter" class="form-grid"><label>状态<select name="status"><option value="">全部状态</option><option>DRAFT</option><option>BASELINED</option><option>MODELED</option><option>INSPECTED</option><option>APPROVED</option><option>FROZEN</option><option>RELEASED</option></select></label><label>场地<input name="venue"></label><label>经办人<input name="operatorId"></label><label>标题关键字<input name="keyword"></label><label>演出时间起点<input name="performanceFrom" type="datetime-local"></label><label>演出时间终点<input name="performanceTo" type="datetime-local"></label><label>临近截止时间<input name="dueBefore" type="datetime-local"></label><label class="check-label"><input name="pendingOnly" type="checkbox">只看临近未放行</label><button type="submit">刷新队列</button></form>
+      <div id="queue-summary" class="hint"></div><div id="queue-items" class="result-grid"></div><div class="actions"><button type="button" id="queue-prev">上一页</button><button type="button" id="queue-next">下一页</button></div>
+    </section>
+    <nav id="steps" aria-label="流程状态"></nav>
+    <div id="message" role="status" aria-live="polite"></div>
+    <section class="layout">
+      <div class="workspace">
+        <article class="card" data-stage="DRAFT">
+          <div class="card-head"><span>01</span><div><h3>建立演出作业</h3><p>记录场地、时间、经办人与安全规则。</p></div></div>
+          <form id="create-form" class="form-grid">
+            <label>作业标题<input name="title" value="春季汇演吊挂"></label><label>场地<input name="venue" value="实验剧场 A 厅"></label>
+            <label>演出时间<input name="performanceAt" type="datetime-local"></label><label>经办人 ID<input name="operatorId" value="operator-01"></label>
+            <label>规则版本<input name="ruleSetVersion" value="RIG-2026.1"></label><button type="submit">创建作业</button>
+          </form>
+          <form id="baseline-form" class="inline-form"><label>设备基线引用<input name="baselineRef" value="BASELINE-A-2026-08"></label><button type="submit">确认设备基线</button></form>
+        </article>
+        <article class="card" data-stage="BASELINED">
+          <div class="card-head"><span>02</span><div><h3>吊杆与载荷建模</h3><p>用克和毫米登记确定性计算输入。</p></div></div>
+          <form id="line-form" class="form-grid"><label>吊杆编号<input name="code" value="LX-01"></label><label>额定载荷（克）<input name="ratedLoadGram" type="number" value="1000000"></label><label>跨度（毫米）<input name="spanMillimeter" type="number" value="12000"></label><label>最大力矩（N·mm）<input name="maxMomentNewtonMillimeter" type="number" value="40000000"></label><button type="submit">登记吊杆</button></form>
+          <form id="point-form" class="form-grid"><label>所属吊杆<select name="lineId" id="point-line-select"></select></label><label>吊点编号<input name="code" value="LX-01-P1"></label><label>提升机额定载荷（克）<input name="hoistRatedLoadGram" type="number" value="1000000"></label><label>吊点位置（毫米）<input name="positionMillimeter" type="number" value="6000"></label><button type="submit">登记吊点</button></form>
+          <form id="load-form" class="form-grid"><label>所属吊杆<select name="lineId" id="line-select"></select></label><label>所属吊点<select name="pointId" id="point-select"></select></label><label>构件编号<input name="componentCode" value="SCENERY-01"></label><label>说明<input name="description" value="主景片与吊索"></label><label>单件重量（克）<input name="weightGram" type="number" value="180000"></label><label>位置（毫米）<input name="positionMillimeter" type="number" value="6000"></label><label>数量<input name="quantity" type="number" value="2"></label><label>提交人<input name="submittedBy" value="operator-01"></label><button type="submit">登记构件</button></form>
+          <form id="batch-load-form"><table><thead><tr><th>吊杆</th><th>吊点</th><th>构件编号</th><th>说明</th><th>重量（克）</th><th>位置（毫米）</th><th>数量</th><th>提交人</th></tr></thead><tbody id="batch-load-rows"></tbody></table><div class="actions"><button type="button" id="add-batch-row">增加一行</button><button type="submit">原子提交整批</button></div></form>
+          <button id="finalize-model">完成建模</button>
+        </article>
+        <article class="card" data-stage="MODELED"><div class="card-head"><span>03</span><div><h3>计算与现场检查</h3><p>查看载荷解释，并逐杆覆盖五类现场检查。</p></div></div><div class="actions"><button id="calculate">计算安全裕量</button><button id="pass-checks">为全部吊杆登记通过检查</button><button id="complete-inspection">确认检查完整</button></div><div id="calculation" class="result-grid"></div></article>
+        <article class="card"><div class="card-head"><span>04</span><div><h3>整改与定向复验</h3><p>阻断项必须有责任人、整改证据和复验结果。</p></div></div><div id="findings"></div><form id="revise-form" class="form-grid"><label>载荷<select name="loadId" id="load-select"></select></label><label>修订重量（克）<input name="weightGram" type="number"></label><label>修订位置（毫米）<input name="positionMillimeter" type="number"></label><button type="submit">保存修订</button></form><form id="load-plan-form"><div id="load-plan-rows"></div><div class="actions"><button type="button" id="preview-plan">影响预演</button><button type="submit" id="apply-plan">确认原子应用</button></div></form><div id="plan-preview"></div><p class="hint">预演不写入数据；正式应用会重新核对版本与方案摘要。</p></article>
+        <article class="card" data-stage="INSPECTED"><div class="card-head"><span>05</span><div><h3>独立复核、冻结与签发</h3><p>复核员可批准或分类退回；批准必须针对当前复核确认标识。</p></div></div><form id="review-form" class="form-grid"><label>复核员 ID<input name="reviewerId" value="reviewer-02"></label><label>决定<select name="decision"><option value="APPROVE">批准</option><option value="RETURN">退回</option></select></label><label>复核说明或退回原因<input name="reason" value="计算、检查覆盖与闭环均已核对"></label><label>退回类别<select name="category"><option value="CALCULATION">载荷计算</option><option value="LIMIT">限位检查</option><option value="BRAKE">制动检查</option><option value="WIRE_ROPE">钢丝绳检查</option><option value="CONNECTOR">连接件检查</option><option value="CLEARANCE">净空检查</option></select></label><fieldset><legend>受影响吊杆</legend><div id="review-lines"></div></fieldset><button type="submit">提交复核决定</button></form><div class="actions"><button id="freeze">冻结场景清单</button><button id="release">签发启用凭据</button><button id="verify">重算摘要并校验</button></div><div id="certificate"></div></article>
+      </div>
+      <aside><section class="summary"><h3>当前作业</h3><dl id="summary"><dt>状态</dt><dd>尚未创建</dd></dl></section><section class="timeline"><h3>审计时间线</h3><ol id="audit"></ol></section></aside>
+    </section>
+  </main>
+  <script src="/assets/app.js" defer></script>
+</body>
+</html>
