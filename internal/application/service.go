@@ -13,10 +13,11 @@ import (
 type Clock func() time.Time
 type IDFactory func() string
 type Service struct {
-	repo  Repository
-	now   Clock
-	newID IDFactory
-	locks *keyedLocks
+	repo             Repository
+	now              Clock
+	newID            IDFactory
+	locks            *keyedLocks
+	previewWorkspace *domain.RiggingSession
 }
 
 func NewService(repo Repository) *Service {

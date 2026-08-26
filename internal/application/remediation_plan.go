@@ -106,7 +106,7 @@ func (s *Service) previewLoadPlan(session *domain.RiggingSession, revisions []Lo
 			return nil, domain.NewError(domain.ErrNotFound, fmt.Sprintf("revisions[%d].loadId", i), "构件不存在")
 		}
 	}
-	copySession, err := cloneSession(session)
+	copySession, err := s.reusablePreviewSession(session)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +133,19 @@ func (s *Service) previewLoadPlan(session *domain.RiggingSession, revisions []Lo
 	}
 	closed, preserved, added := compareCalculationFindings(session, copySession)
 	return &LoadPlanPreview{SessionID: session.ID, Version: session.Version, RuleSetVersion: session.RuleSetVersion, ProposalDigest: digest, Impacts: impacts, ExpectedClosed: closed, ExpectedPreserved: preserved, ExpectedNew: added, Applicable: len(added) == 0}, nil
+}
+
+func (s *Service) reusablePreviewSession(session *domain.RiggingSession) (*domain.RiggingSession, error) {
+	copySession, err := cloneSession(session)
+	if err != nil {
+		return nil, err
+	}
+	if s.previewWorkspace == nil {
+		s.previewWorkspace = copySession
+	} else {
+		*s.previewWorkspace = *copySession
+	}
+	return s.previewWorkspace, nil
 }
 
 func cloneSession(session *domain.RiggingSession) (*domain.RiggingSession, error) {
