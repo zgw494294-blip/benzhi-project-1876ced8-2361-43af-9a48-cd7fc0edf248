@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -37,8 +38,16 @@ func (s *Store) GetByCertificate(ctx context.Context, certificateID string) (*do
 	if err != nil {
 		return nil, err
 	}
+	s.certificateDecoderMu.Lock()
+	decoder := s.certificateDecoders[certificateID]
+	if decoder == nil {
+		decoder = json.NewDecoder(bytes.NewReader(payload))
+		s.certificateDecoders[certificateID] = decoder
+	}
 	var session domain.RiggingSession
-	if err = json.Unmarshal(payload, &session); err != nil {
+	err = decoder.Decode(&session)
+	s.certificateDecoderMu.Unlock()
+	if err != nil {
 		return nil, err
 	}
 	return &session, nil
