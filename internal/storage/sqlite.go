@@ -7,9 +7,15 @@ import (
 	_ "modernc.org/sqlite"
 	"net/url"
 	"path/filepath"
+	"rigging-readiness-desk/internal/domain"
+	"sync"
 )
 
-type Store struct{ db *sql.DB }
+type Store struct {
+	db       *sql.DB
+	cacheMu  sync.RWMutex
+	sessions map[string]*domain.RiggingSession
+}
 
 func Open(path string) (*Store, error) {
 	if path == "" {
@@ -29,7 +35,7 @@ func Open(path string) (*Store, error) {
 	}
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
-	store := &Store{db: db}
+	store := &Store{db: db, sessions: map[string]*domain.RiggingSession{}}
 	ctx := context.Background()
 	if _, err = db.ExecContext(ctx, "PRAGMA foreign_keys = ON"); err != nil {
 		db.Close()

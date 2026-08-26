@@ -32,7 +32,11 @@ func (s *Store) Create(ctx context.Context, session *domain.RiggingSession, even
 	if err = insertIdempotency(ctx, tx, idem); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	s.rememberSession(session)
+	return nil
 }
 func (s *Store) Save(ctx context.Context, session *domain.RiggingSession, expected int64, event application.AuditEvent, idem *application.IdempotencyRecord) error {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -64,7 +68,11 @@ func (s *Store) Save(ctx context.Context, session *domain.RiggingSession, expect
 	if err = insertIdempotency(ctx, tx, idem); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	s.rememberSession(session)
+	return nil
 }
 func insertAudit(ctx context.Context, tx *sql.Tx, event application.AuditEvent) error {
 	_, err := tx.ExecContext(ctx, `INSERT INTO audit_events(id,session_id,event_type,actor_id,detail,created_at) VALUES(?,?,?,?,?,?)`, event.ID, event.SessionID, event.Type, event.ActorID, event.Detail, event.CreatedAt.Format(timeFormat))

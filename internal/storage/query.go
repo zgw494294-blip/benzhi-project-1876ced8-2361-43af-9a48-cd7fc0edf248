@@ -13,6 +13,9 @@ import (
 const timeFormat = time.RFC3339Nano
 
 func (s *Store) Get(ctx context.Context, id string) (*domain.RiggingSession, error) {
+	if session := s.cachedSession(id); session != nil {
+		return session, nil
+	}
 	var payload []byte
 	err := s.db.QueryRowContext(ctx, "SELECT payload FROM sessions WHERE id = ?", id).Scan(&payload)
 	if err == sql.ErrNoRows {
@@ -25,6 +28,7 @@ func (s *Store) Get(ctx context.Context, id string) (*domain.RiggingSession, err
 	if err = json.Unmarshal(payload, &session); err != nil {
 		return nil, err
 	}
+	s.rememberSession(&session)
 	return &session, nil
 }
 
