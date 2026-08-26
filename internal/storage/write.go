@@ -26,13 +26,13 @@ func (s *Store) Create(ctx context.Context, session *domain.RiggingSession, even
 	if err = replaceChildren(ctx, tx, session); err != nil {
 		return err
 	}
-	if err = insertAudit(ctx, tx, event); err != nil {
-		return err
-	}
 	if err = insertIdempotency(ctx, tx, idem); err != nil {
 		return err
 	}
-	return tx.Commit()
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+	return s.appendAudit(ctx, event)
 }
 func (s *Store) Save(ctx context.Context, session *domain.RiggingSession, expected int64, event application.AuditEvent, idem *application.IdempotencyRecord) error {
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -68,6 +68,10 @@ func (s *Store) Save(ctx context.Context, session *domain.RiggingSession, expect
 }
 func insertAudit(ctx context.Context, tx *sql.Tx, event application.AuditEvent) error {
 	_, err := tx.ExecContext(ctx, `INSERT INTO audit_events(id,session_id,event_type,actor_id,detail,created_at) VALUES(?,?,?,?,?,?)`, event.ID, event.SessionID, event.Type, event.ActorID, event.Detail, event.CreatedAt.Format(timeFormat))
+	return err
+}
+func (s *Store) appendAudit(ctx context.Context, event application.AuditEvent) error {
+	_, err := s.db.ExecContext(ctx, `INSERT INTO audit_events(id,session_id,event_type,actor_id,detail,created_at) VALUES(?,?,?,?,?,?)`, event.ID, event.SessionID, event.Type, event.ActorID, event.Detail, event.CreatedAt.Format(timeFormat))
 	return err
 }
 func insertIdempotency(ctx context.Context, tx *sql.Tx, record *application.IdempotencyRecord) error {
